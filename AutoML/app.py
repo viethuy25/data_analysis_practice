@@ -10,6 +10,15 @@ from pycaret.regression import setup, compare_models, pull, save_model, load_mod
 from streamlit_pandas_profiling import st_profile_report
 import os
 
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from lightgbm import LGBMRegressor
+from sklearn.neural_network import MLPRegressor
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error
+from transformers import BertTokenizer, BertModel
+import torch
+
 def load_data(file_path):
     if os.path.exists(file_path):
         return pd.read_csv(file_path, index_col=None)
@@ -42,15 +51,61 @@ def run_modelling(df):
         df[chosen_target] = pd.to_datetime(df[chosen_target]).astype(int) // 10**9
 
     if st.button('Run Modelling'):
-        setup(df, target=chosen_target)
-        setup_df = pull()
-        st.dataframe(setup_df)
+        # setup(df, target=chosen_target)
+        # setup_df = pull()
+        # st.dataframe(setup_df)
 
 
-        best_model = compare_models()
-        compare_df = pull()
-        st.dataframe(compare_df)
-        save_model(best_model, 'best_model')
+        # best_model = compare_models()
+        # compare_df = pull()
+        # st.dataframe(compare_df)
+        # save_model(best_model, 'best_model')
+
+        st.write(df.dtypes)
+
+        # Make sure the DataFrame is properly indexed
+        df.reset_index(drop=True, inplace=True)
+
+         # Exclude "ride_id" and other non-numeric columns from features
+        non_numeric_columns = ["ride_id", "rideable_type", "start_station_name", "end_station_name", "member_casual"]
+        numeric_columns = df.select_dtypes(include='float64').columns
+        features_to_exclude = [chosen_target] + non_numeric_columns
+        X = df.drop(columns=features_to_exclude)
+        y = df[chosen_target]
+
+        # Split the data into training and testing sets
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+        # Linear Regression
+        linear_model = LinearRegression()
+        linear_model.fit(X_train, y_train)
+        linear_pred = linear_model.predict(X_test)
+        st.write("Linear Regression MSE:", mean_squared_error(y_test, linear_pred))
+
+        # LightGBM
+        lgbm_model = LGBMRegressor()
+        lgbm_model.fit(X_train, y_train)
+        lgbm_pred = lgbm_model.predict(X_test)
+        st.write("LightGBM MSE:", mean_squared_error(y_test, lgbm_pred))
+
+        # MLP (Neural Network)
+        mlp_model = MLPRegressor()
+        mlp_model.fit(X_train, y_train)
+        mlp_pred = mlp_model.predict(X_test)
+        st.write("MLP (Neural Network) MSE:", mean_squared_error(y_test, mlp_pred))
+
+        # Random Forest (Additional Model)
+        rf_model = RandomForestRegressor()
+        rf_model.fit(X_train, y_train)
+        rf_pred = rf_model.predict(X_test)
+        st.write("Random Forest MSE:", mean_squared_error(y_test, rf_pred))
+
+        # # BERT (Transformer) - This is a placeholder; BERT is typically used for NLP tasks
+        # tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        # model = BertModel.from_pretrained('bert-base-uncased')
+        # inputs = tokenizer("Hello, this is a sample input.", return_tensors="pt")
+        # outputs = model(**inputs)
+        # st.write("BERT is not directly applicable for tabular data; this is just a placeholder.")
 
 def download_model():
     with open('best_model.pkl', 'rb') as f:
@@ -76,7 +131,7 @@ def main():
         if choice == "Profiling":
             exploratory_data_analysis(df)
         elif choice == "Modelling":
-            st.title ("TBD") #run_modelling(df)
+            run_modelling(df)
         elif choice == "Download":
             st.title ("TBD") #download_model()
 
